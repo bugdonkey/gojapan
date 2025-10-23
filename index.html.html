@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日本旅遊記帳本</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: #f5f3f0;
+        }
+        
+        .setouchi-card {
+            background: #ffffff;
+            border: 1px solid #e8e4df;
+        }
+        
+        .setouchi-shadow {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        
+        .setouchi-shadow-lg {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        }
+        
+        .text-setouchi-primary {
+            color: #5a7c8f;
+        }
+        
+        .bg-setouchi-primary {
+            background-color: #5a7c8f;
+        }
+        
+        .bg-setouchi-light {
+            background-color: #f9f7f5;
+        }
+        
+        .border-setouchi {
+            border-color: #d4cec6;
+        }
+        
+        .hover-lift {
+            transition: all 0.2s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #5a7c8f;
+            box-shadow: 0 0 0 2px rgba(90, 124, 143, 0.1);
+        }
+        
+        .category-tag {
+            background: #e8e4df;
+            color: #6b6560;
+        }
+        
+        .stat-border {
+            border-left: 3px solid #5a7c8f;
+        }
+        
+        button {
+            transition: all 0.2s ease;
+        }
+        
+        .btn-setouchi {
+            background: #5a7c8f;
+            color: white;
+        }
+        
+        .btn-setouchi:hover {
+            background: #4a6c7f;
+        }
+        
+        .btn-outline {
+            border: 1px solid #d4cec6;
+            color: #6b6560;
+            background: white;
+        }
+        
+        .btn-outline:hover {
+            border-color: #5a7c8f;
+            color: #5a7c8f;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto"></div>
+
+    <script>
+        class ExpenseTracker {
+            constructor() {
+                this.expenses = [];
+                this.people = ['人員A', '人員B', '人員C'];
+                this.categories = ['餐飲', '交通', '住宿', '門票', '購物', '其他'];
+                this.isEditingNames = false;
+                this.tempNames = [...this.people];
+                
+                this.newExpense = {
+                    date: '',
+                    category: '餐飲',
+                    description: '',
+                    amount: '',
+                    payer: this.people[0],
+                    participants: [...this.people]
+                };
+                
+                this.loadData();
+                this.render();
+            }
+
+            loadData() {
+                try {
+                    const savedExpenses = localStorage.getItem('tripExpenses');
+                    const savedPeople = localStorage.getItem('tripPeople');
+                    
+                    if (savedExpenses) {
+                        this.expenses = JSON.parse(savedExpenses);
+                    }
+                    
+                    if (savedPeople) {
+                        this.people = JSON.parse(savedPeople);
+                        this.tempNames = [...this.people];
+                        this.newExpense.payer = this.people[0];
+                        this.newExpense.participants = [...this.people];
+                    }
+                } catch (e) {
+                    console.error('載入資料失敗:', e);
+                }
+            }
+
+            saveData() {
+                try {
+                    localStorage.setItem('tripExpenses', JSON.stringify(this.expenses));
+                    localStorage.setItem('tripPeople', JSON.stringify(this.people));
+                } catch (e) {
+                    alert('儲存失敗,請檢查瀏覽器設定');
+                }
+            }
+
+            addExpense() {
+                if (!this.newExpense.date || !this.newExpense.amount || this.newExpense.participants.length === 0) {
+                    alert('請填寫日期、金額並至少選擇一位參與者');
+                    return;
+                }
+
+                const expense = {
+                    ...this.newExpense,
+                    amount: parseFloat(this.newExpense.amount),
+                    id: Date.now()
+                };
+
+                this.expenses.push(expense);
+                this.saveData();
+                
+                this.newExpense = {
+                    date: '',
+                    category: '餐飲',
+                    description: '',
+                    amount: '',
+                    payer: this.people[0],
+                    participants: [...this.people]
+                };
+                
+                this.render();
+            }
+
+            deleteExpense(id) {
+                if (confirm('確定要刪除這筆支出嗎?')) {
+                    this.expenses = this.expenses.filter(e => e.id !== id);
+                    this.saveData();
+                    this.render();
+                }
+            }
+
+            toggleParticipant(person) {
+                const idx = this.newExpense.participants.indexOf(person);
+                if (idx > -1) {
+                    if (this.newExpense.participants.length > 1) {
+                        this.newExpense.participants.splice(idx, 1);
+                    } else {
+                        alert('至少需要一位參與者');
+                    }
+                } else {
+                    this.newExpense.participants.push(person);
+                }
+                this.render();
+            }
+
+            updateNames() {
+                if (this.tempNames.some(name => !name.trim())) {
+                    alert('姓名不能為空');
+                    return;
+                }
+                
+                const oldPeople = [...this.people];
+                this.people = [...this.tempNames];
+                
+                this.expenses = this.expenses.map(expense => ({
+                    ...expense,
+                    payer: this.tempNames[oldPeople.indexOf(expense.payer)] || expense.payer,
+                    participants: expense.participants.map(p => 
+                        this.tempNames[oldPeople.indexOf(p)] || p
+                    )
+                }));
+                
+                this.newExpense.payer = this.people[0];
+                this.newExpense.participants = [...this.people];
+                
+                this.isEditingNames = false;
+                this.saveData();
+                this.render();
+            }
+
+            calculateBalances() {
+                const balances = {};
+                this.people.forEach(person => {
+                    balances[person] = 0;
+                });
+
+                this.expenses.forEach(expense => {
+                    const splitAmount = expense.amount / expense.participants.length;
+                    balances[expense.payer] += expense.amount;
+                    expense.participants.forEach(participant => {
+                        balances[participant] -= splitAmount;
+                    });
+                });
+
+                return balances;
+            }
+
+            calculateSettlements() {
+                const balances = this.calculateBalances();
+                const creditors = [];
+                const debtors = [];
+
+                Object.entries(balances).forEach(([person, balance]) => {
+                    if (balance > 0.01) {
+                        creditors.push({ person, amount: balance });
+                    } else if (balance < -0.01) {
+                        debtors.push({ person, amount: -balance });
+                    }
+                });
+
+                const settlements = [];
+                let i = 0, j = 0;
+
+                while (i < creditors.length && j < debtors.length) {
+                    const creditor = creditors[i];
+                    const debtor = debtors[j];
+                    const amount = Math.min(creditor.amount, debtor.amount);
+
+                    if (amount > 0.01) {
+                        settlements.push({
+                            from: debtor.person,
+                            to: creditor.person,
+                            amount: amount
+                        });
+                    }
+
+                    creditor.amount -= amount;
+                    debtor.amount -= amount;
+
+                    if (creditor.amount < 0.01) i++;
+                    if (debtor.amount < 0.01) j++;
+                }
+
+                return settlements;
+            }
+
+            exportToCSV() {
+                const balances = this.calculateBalances();
+                const settlements = this.calculateSettlements();
+                
+                let csv = '\uFEFF';
+                csv += '日本旅遊記帳明細\n\n';
+                csv += '支出明細\n';
+                csv += '日期,類別,說明,金額(¥),付款人,分攤者,每人金額(¥)\n';
+                
+                this.expenses.forEach(expense => {
+                    csv += `${expense.date},${expense.category},${expense.description},${expense.amount},${expense.payer},"${expense.participants.join(', ')}",${(expense.amount / expense.participants.length).toFixed(0)}\n`;
+                });
+                
+                const totalExpense = this.expenses.reduce((sum, e) => sum + e.amount, 0);
+                csv += '\n總計\n';
+                csv += `總支出,¥${totalExpense.toFixed(0)}\n`;
+                csv += `總筆數,${this.expenses.length}\n`;
+                csv += `平均每人,¥${(totalExpense / 3).toFixed(0)}\n`;
+                
+                csv += '\n各人結算\n';
+                csv += '姓名,狀態,金額(¥)\n';
+                this.people.forEach(person => {
+                    const balance = balances[person];
+                    csv += `${person},${balance >= 0 ? '應收' : '應付'},${Math.abs(balance).toFixed(0)}\n`;
+                });
+                
+                csv += '\n轉帳方案\n';
+                csv += '付款人,收款人,金額(¥)\n';
+                if (settlements.length === 0) {
+                    csv += '已結清,無需轉帳,0\n';
+                } else {
+                    settlements.forEach(s => {
+                        csv += `${s.from},${s.to},${s.amount.toFixed(0)}\n`;
+                    });
+                }
+                
+                this.downloadFile(csv, `日本旅遊記帳_${new Date().toLocaleDateString('zh-TW')}.csv`, 'text/csv;charset=utf-8;');
+            }
+
+            exportToJSON() {
+                const data = {
+                    exportDate: new Date().toISOString(),
+                    people: this.people,
+                    expenses: this.expenses,
+                    summary: {
+                        totalExpense: this.expenses.reduce((sum, e) => sum + e.amount, 0),
+                        totalCount: this.expenses.length,
+                        balances: this.calculateBalances(),
+                        settlements: this.calculateSettlements()
+                    }
+                };
+                
+                this.downloadFile(JSON.stringify(data, null, 2), `日本旅遊記帳_${new Date().toLocaleDateString('zh-TW')}.json`, 'application/json');
+            }
+
+            importFromJSON(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.people && data.expenses) {
+                            if (confirm('確定要匯入資料嗎? 這會覆蓋現有資料。')) {
+                                this.people = data.people;
+                                this.expenses = data.expenses;
+                                this.tempNames = [...data.people];
+                                this.saveData();
+                                this.render();
+                                alert('資料匯入成功');
+                            }
+                        } else {
+                            alert('檔案格式不正確');
+                        }
+                    } catch (error) {
+                        alert('檔案讀取失敗');
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            downloadFile(content, filename, type) {
+                const blob = new Blob([content], { type });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
+            clearAllData() {
+                if (confirm('確定要清除所有資料嗎? 此操作無法復原')) {
+                    if (confirm('真的確定嗎? 建議先匯出備份')) {
+                        this.expenses = [];
+                        this.people = ['人員A', '人員B', '人員C'];
+                        this.tempNames = ['人員A', '人員B', '人員C'];
+                        this.newExpense = {
+                            date: '',
+                            category: '餐飲',
+                            description: '',
+                            amount: '',
+                            payer: '人員A',
+                            participants: ['人員A', '人員B', '人員C']
+                        };
+                        localStorage.clear();
+                        this.render();
+                        alert('資料已清除');
+                    }
+                }
+            }
+
+            render() {
+                const app = document.getElementById('app');
+                const totalExpense = this.expenses.reduce((sum, e) => sum + e.amount, 0);
+                const balances = this.calculateBalances();
+                const settlements = this.calculateSettlements();
+
+                app.innerHTML = `
+                    <div class="setouchi-card rounded-lg setouchi-shadow-lg p-6 sm:p-10 mb-6">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between mb-10 flex-wrap gap-4">
+                            <div>
+                                <h1 class="text-3xl sm:text-4xl font-light text-setouchi-primary mb-1">日本旅遊記帳</h1>
+                                <p class="text-sm text-gray-400 font-light">Travel Expense Tracker</p>
+                            </div>
+                            <div class="flex gap-2 flex-wrap">
+                                <button onclick="tracker.exportToCSV()" class="btn-outline px-4 py-2 rounded text-sm font-light">
+                                    匯出 CSV
+                                </button>
+                                <button onclick="tracker.exportToJSON()" class="btn-outline px-4 py-2 rounded text-sm font-light">
+                                    備份
+                                </button>
+                                <label class="btn-outline px-4 py-2 rounded text-sm font-light cursor-pointer">
+                                    還原
+                                    <input type="file" accept=".json" onchange="if(this.files[0]) tracker.importFromJSON(this.files[0]); this.value='';" class="hidden">
+                                </label>
+                                <button onclick="tracker.clearAllData()" class="btn-outline px-4 py-2 rounded text-sm font-light">
+                                    清除
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Members Section -->
+                        <div class="mb-8 p-5 bg-setouchi-light rounded border border-setouchi">
+                            <p class="text-sm text-gray-500 mb-3 font-light">成員</p>
+                            ${this.isEditingNames ? `
+                                <div class="space-y-3">
+                                    ${this.tempNames.map((name, i) => `
+                                        <input type="text" value="${name}" 
+                                            onchange="tracker.tempNames[${i}] = this.value"
+                                            class="w-full px-3 py-2 border border-setouchi rounded text-sm"
+                                            placeholder="成員 ${i + 1}">
+                                    `).join('')}
+                                    <div class="flex gap-2">
+                                        <button onclick="tracker.updateNames()" class="btn-setouchi px-4 py-2 rounded text-sm">
+                                            確定
+                                        </button>
+                                        <button onclick="tracker.isEditingNames = false; tracker.tempNames = [...tracker.people]; tracker.render();" 
+                                            class="btn-outline px-4 py-2 rounded text-sm">
+                                            取消
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="flex items-center justify-between flex-wrap gap-3">
+                                    <div class="flex gap-3 flex-wrap">
+                                        ${this.people.map(person => `
+                                            <span class="px-3 py-1.5 setouchi-card border border-setouchi rounded text-gray-700 text-sm">
+                                                ${person}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                    <button onclick="tracker.isEditingNames = true; tracker.render();" 
+                                        class="text-xs text-setouchi-primary hover:underline font-light">
+                                        修改
+                                    </button>
+                                </div>
+                            `}
+                        </div>
+
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+                            <div class="setouchi-card rounded p-5 stat-border hover-lift">
+                                <p class="text-xs text-gray-500 mb-2 font-light">總支出</p>
+                                <p class="text-3xl font-light text-setouchi-primary">¥${totalExpense.toLocaleString()}</p>
+                            </div>
+                            <div class="setouchi-card rounded p-5 stat-border hover-lift">
+                                <p class="text-xs text-gray-500 mb-2 font-light">平均每人</p>
+                                <p class="text-3xl font-light text-setouchi-primary">¥${Math.round(totalExpense / 3).toLocaleString()}</p>
+                            </div>
+                            <div class="setouchi-card rounded p-5 stat-border hover-lift">
+                                <p class="text-xs text-gray-500 mb-2 font-light">筆數</p>
+                                <p class="text-3xl font-light text-setouchi-primary">${this.expenses.length}</p>
+                            </div>
+                        </div>
+
+                        <!-- Add Expense Form -->
+                        <div class="bg-setouchi-light rounded p-6 sm:p-8 mb-8 border border-setouchi">
+                            <h2 class="text-lg font-light text-gray-700 mb-6">新增支出</h2>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-2 font-light">日期</label>
+                                    <input type="date" id="expenseDate" value="${this.newExpense.date}"
+                                        onchange="tracker.newExpense.date = this.value; tracker.render();"
+                                        class="w-full px-3 py-2 border border-setouchi rounded text-sm bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-2 font-light">類別</label>
+                                    <select id="expenseCategory" onchange="tracker.newExpense.category = this.value; tracker.render();"
+                                        class="w-full px-3 py-2 border border-setouchi rounded text-sm bg-white">
+                                        ${this.categories.map(cat => 
+                                            `<option value="${cat}" ${this.newExpense.category === cat ? 'selected' : ''}>${cat}</option>`
+                                        ).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-2 font-light">金額（日圓）</label>
+                                    <input type="number" id="expenseAmount" value="${this.newExpense.amount}" placeholder="1000"
+                                        onchange="tracker.newExpense.amount = this.value; tracker.render();"
+                                        class="w-full px-3 py-2 border border-setouchi rounded text-sm bg-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-2 font-light">付款人</label>
+                                    <select id="expensePayer" onchange="tracker.newExpense.payer = this.value; tracker.render();"
+                                        class="w-full px-3 py-2 border border-setouchi rounded text-sm bg-white">
+                                        ${this.people.map(person => 
+                                            `<option value="${person}" ${this.newExpense.payer === person ? 'selected' : ''}>${person}</option>`
+                                        ).join('')}
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs text-gray-500 mb-2 font-light">說明</label>
+                                    <input type="text" id="expenseDesc" value="${this.newExpense.description}" placeholder="一蘭拉麵晚餐"
+                                        onchange="tracker.newExpense.description = this.value; tracker.render();"
+                                        class="w-full px-3 py-2 border border-setouchi rounded text-sm bg-white">
+                                </div>
+                            </div>
+                            <div class="mt-5">
+                                <label class="block text-xs text-gray-500 mb-3 font-light">分攤者</label>
+                                <div class="flex gap-3 flex-wrap">
+                                    ${this.people.map(person => `
+                                        <label class="flex items-center gap-2 cursor-pointer px-3 py-2 rounded border transition-all
+                                            ${this.newExpense.participants.includes(person) ? 'border-setouchi bg-white' : 'border-gray-200 bg-white'}">
+                                            <input type="checkbox" ${this.newExpense.participants.includes(person) ? 'checked' : ''}
+                                                onchange="tracker.toggleParticipant('${person}')"
+                                                class="w-4 h-4">
+                                            <span class="text-sm text-gray-700 font-light">${person}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <button onclick="tracker.addExpense()" 
+                                class="mt-6 w-full btn-setouchi px-6 py-3 rounded font-light">
+                                新增支出
+                            </button>
+                        </div>
+
+                        ${this.expenses.length > 0 ? `
+                            <!-- Expense List -->
+                            <div class="mb-8">
+                                <h2 class="text-lg font-light text-gray-700 mb-6">支出明細</h2>
+                                <div class="space-y-3">
+                                    ${this.expenses.map(expense => `
+                                        <div class="setouchi-card rounded p-5 hover-lift">
+                                            <div class="flex items-center justify-between flex-wrap gap-4">
+                                                <div class="flex items-center gap-4 flex-1">
+                                                    <div class="category-tag px-3 py-1 rounded text-xs">
+                                                        ${expense.category}
+                                                    </div>
+                                                    <div class="flex-1">
+                                                        <p class="text-gray-800 font-light">${expense.description || '未命名'}</p>
+                                                        <p class="text-gray-400 text-xs mt-1 font-light">
+                                                            ${expense.date} · ${expense.payer} · ${expense.participants.join(', ')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-4">
+                                                    <div class="text-right">
+                                                        <p class="text-2xl font-light text-setouchi-primary">¥${expense.amount.toLocaleString()}</p>
+                                                        <p class="text-xs text-gray-400 mt-1 font-light">每人 ¥${Math.round(expense.amount / expense.participants.length).toLocaleString()}</p>
+                                                    </div>
+                                                    <button onclick="tracker.deleteExpense(${expense.id})" 
+                                                        class="text-gray-400 hover:text-red-500 transition-colors">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <!-- Balance Cards -->
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+                                ${this.people.map((person) => {
+                                    const balance = balances[person];
+                                    return `
+                                        <div class="setouchi-card rounded p-5 hover-lift stat-border">
+                                            <h3 class="text-gray-700 font-light mb-3">${person}</h3>
+                                            <p class="text-xs text-gray-500 mb-2 font-light">
+                                                ${balance >= 0 ? '應收' : '應付'}
+                                            </p>
+                                            <p class="text-3xl font-light ${balance >= 0 ? 'text-setouchi-primary' : 'text-gray-600'}">
+                                                ¥${Math.abs(balance).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+
+                            <!-- Settlement Section -->
+                            <div class="bg-setouchi-light rounded p-8 border border-setouchi">
+                                <h2 class="text-lg font-light text-gray-700 mb-6">結算方案</h2>
+                                ${settlements.length === 0 ? `
+                                    <div class="setouchi-card rounded p-8 text-center">
+                                        <p class="text-gray-500 font-light">已結清，無需轉帳</p>
+                                    </div>
+                                ` : `
+                                    <div class="space-y-4">
+                                        ${settlements.map((s) => `
+                                            <div class="setouchi-card rounded p-5 hover-lift">
+                                                <div class="flex items-center justify-between flex-wrap gap-4">
+                                                    <p class="text-gray-700 font-light">
+                                                        ${s.from} 
+                                                        <span class="text-gray-400 mx-2">→</span> 
+                                                        ${s.to}
+                                                    </p>
+                                                    <p class="text-2xl font-light text-setouchi-primary">
+                                                        ¥${Math.round(s.amount).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `}
+                            </div>
+                        ` : `
+                            <div class="bg-setouchi-light rounded p-12 text-center border border-setouchi">
+                                <p class="text-gray-400 font-light">尚無支出記錄</p>
+                            </div>
+                        `}
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="text-center py-6">
+                        <p class="text-xs text-gray-400 font-light">資料儲存於本機裝置</p>
+                    </div>
+                `;
+            }
+        }
+
+        let tracker;
+        window.onload = () => {
+            tracker = new ExpenseTracker();
+        };
+    </script>
+</body>
+</html>
